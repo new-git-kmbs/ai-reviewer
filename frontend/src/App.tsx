@@ -11,7 +11,7 @@ export default function App() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
           <Link to="/dashboard" style={{ textDecoration: "none", color: "inherit" }}>
 			<div style={{ display: "flex", flexDirection: "column", lineHeight: 1.2 }}>
-			<span style={{ fontWeight: 800, fontSize: 20 }}>Peruri Labs</span>
+			<span style={{ fontWeight: 800, fontSize: 22 }}>Peruri Labs</span>
 			<span style={{ fontSize: 12, opacity: 0.6 }}>
 				Founded by Vidya Peruri
 			</span>
