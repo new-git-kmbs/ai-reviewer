@@ -1,4 +1,4 @@
-package com.ai.reviewer.backend.config;
+package com.ai.platform.config;
 
 import java.util.List;
 

@@ -1,4 +1,4 @@
-package com.ai.reviewer.backend.config;
+package com.ai.platform.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,9 +16,7 @@ public class CorsConfig {
         registry.addMapping("/api/**")
             .allowedOrigins(
                 "http://localhost:5173",
-                "https://ai-reviewer-six.vercel.app",
-                "https://ai-reviewer-lug2ptqu2-vidya-peruris-projects.vercel.app",
-                "https://ai-reviewer-git-main-vidya-peruris-projects.vercel.app"
+                "https://peruri-labs.vercel.app"
             )
             .allowedMethods("GET", "POST", "OPTIONS")
             .allowedHeaders("*")

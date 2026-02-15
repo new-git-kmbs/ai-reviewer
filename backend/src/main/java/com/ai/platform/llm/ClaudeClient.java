@@ -1,4 +1,4 @@
-package com.ai.reviewer.backend.llm;
+package com.ai.platform.llm;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 

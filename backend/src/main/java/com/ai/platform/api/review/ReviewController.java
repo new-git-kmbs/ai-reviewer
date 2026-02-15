@@ -1,6 +1,6 @@
-package com.ai.reviewer.backend.api;
+package com.ai.platform.api.review;
 
-import com.ai.reviewer.backend.llm.ClaudeClient;
+import com.ai.platform.llm.ClaudeClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.web.bind.annotation.*;
 
