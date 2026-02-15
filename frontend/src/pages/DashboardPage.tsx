@@ -98,13 +98,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Trading (future) */}
-        <div style={dashedCardStyle}>
-          <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>
-            Trading
-          </div>
-          <div>Journal, checklist, review tools (future)</div>
-        </div>
+        
       </div>
     </div>
   );
