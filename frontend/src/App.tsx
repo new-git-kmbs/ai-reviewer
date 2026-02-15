@@ -8,6 +8,7 @@ import {
 import { BrowserRouter, Routes, Route, Navigate, Link } from "react-router-dom";
 import DashboardPage from "./pages/DashboardPage";
 import AiReviewerPage from "./pages/AiReviewerPage";
+import SpendingIntelligencePage from "./pages/SpendingIntelligencePage";
 
 export default function App() {
   return (
@@ -39,10 +40,23 @@ export default function App() {
               marginBottom: 36,
             }}
           >
-            <Link to="/dashboard" style={{ textDecoration: "none", color: "inherit" }}>
-              <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.2 }}>
-                <span style={{ fontWeight: 800, fontSize: 22 }}>Peruri Labs</span>
-                <span style={{ fontSize: 12, opacity: 0.6 }}>Founded by Vidya Peruri</span>
+            <Link
+              to="/dashboard"
+              style={{ textDecoration: "none", color: "inherit" }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  lineHeight: 1.2,
+                }}
+              >
+                <span style={{ fontWeight: 800, fontSize: 22 }}>
+                  Peruri Labs
+                </span>
+                <span style={{ fontSize: 12, opacity: 0.6 }}>
+                  Founded by Vidya Peruri
+                </span>
               </div>
             </Link>
 
@@ -73,6 +87,21 @@ export default function App() {
                 <>
                   <SignedIn>
                     <AiReviewerPage />
+                  </SignedIn>
+                  <SignedOut>
+                    <RedirectToSignIn />
+                  </SignedOut>
+                </>
+              }
+            />
+
+            {/* ✅ Protected route: Spending Intelligence */}
+            <Route
+              path="/spending-intelligence"
+              element={
+                <>
+                  <SignedIn>
+                    <SpendingIntelligencePage />
                   </SignedIn>
                   <SignedOut>
                     <RedirectToSignIn />

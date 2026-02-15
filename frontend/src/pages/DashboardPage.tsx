@@ -3,6 +3,34 @@ import { useNavigate } from "react-router-dom";
 export default function DashboardPage() {
   const navigate = useNavigate();
 
+  const parentCardStyle: React.CSSProperties = {
+    border: "1px solid #e5e7eb",
+    borderRadius: 14,
+    padding: 16,
+    boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+  };
+
+  const childCardStyle: React.CSSProperties = {
+    border: "1px solid #e5e5e5",
+    borderRadius: 10,
+    padding: 14,
+    cursor: "pointer",
+    transition: "all 0.15s ease",
+  };
+
+  const comingSoonStyle: React.CSSProperties = {
+    marginTop: 12,
+    fontSize: 13,
+    opacity: 0.65,
+  };
+
+  const dashedCardStyle: React.CSSProperties = {
+    border: "1px dashed #d1d5db",
+    borderRadius: 14,
+    padding: 16,
+    opacity: 0.7,
+  };
+
   return (
     <div>
       <h2 style={{ marginBottom: 6 }}>Dashboard</h2>
@@ -16,33 +44,16 @@ export default function DashboardPage() {
         }}
       >
         {/* Product Suite (parent card) */}
-        <div
-          onClick={() => navigate("/pm")}
-          style={{
-            border: "1px solid #e5e7eb",
-            borderRadius: 14,
-            padding: 16,
-            cursor: "pointer",
-            boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-          }}
-        >
+        <div style={parentCardStyle}>
           <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10 }}>
             Product Suite
           </div>
 
           {/* AI Reviewer (child card) */}
           <div
-            onClick={(e) => {
-              e.stopPropagation(); // ✅ prevents also triggering the parent (/pm)
-              navigate("/ai-reviewer");
-            }}
-            style={{
-              border: "1px solid #e5e5e5",
-              borderRadius: 10,
-              padding: 14,
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-            }}
+            onClick={() => navigate("/ai-reviewer")}
+            style={childCardStyle}
+            title="Open AI User Story Reviewer"
           >
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>
               AI User Story Reviewer
@@ -54,36 +65,41 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div style={{ marginTop: 12, fontSize: 13, opacity: 0.65 }}>
+          <div style={comingSoonStyle}>
             Coming soon: AI User Story Generator · AI PRD Builder · AI Backlog
             Optimizer
           </div>
         </div>
 
-        {/* Investing (future) */}
-        <div
-          style={{
-            border: "1px dashed #d1d5db",
-            borderRadius: 14,
-            padding: 16,
-            opacity: 0.7,
-          }}
-        >
-          <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>
-            Investing
+        {/* Finance (parent card) */}
+        <div style={parentCardStyle}>
+          <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10 }}>
+            Finance
           </div>
-          <div>Portfolio calculator, fund comparisons, reverse calculator (future)</div>
+
+          {/* Spending Intelligence (child card) */}
+          <div
+            onClick={() => navigate("/spending-intelligence")}
+            style={childCardStyle}
+            title="Open AI Spending Intelligence"
+          >
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>
+              AI Spending Intelligence
+            </div>
+
+            <div style={{ opacity: 0.8, lineHeight: 1.35 }}>
+              Upload your bank export and get monthly summaries, category
+              breakdowns, and AI-powered insights.
+            </div>
+          </div>
+
+          <div style={comingSoonStyle}>
+            Coming soon: Portfolio Analyzer · Fund Comparison · Reverse CAGR
+          </div>
         </div>
 
         {/* Trading (future) */}
-        <div
-          style={{
-            border: "1px dashed #d1d5db",
-            borderRadius: 14,
-            padding: 16,
-            opacity: 0.7,
-          }}
-        >
+        <div style={dashedCardStyle}>
           <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>
             Trading
           </div>
