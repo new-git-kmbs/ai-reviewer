@@ -12,11 +12,25 @@ type AiCategory = {
   merchants: AiMerchant[];
 };
 
+type AiInsights = {
+  highlights?: string[];
+  topSpendingCategory?: string;
+  topMerchant?: string;
+  concentrationNotes?: string[];
+  optimizationIdeas?: string[];
+  anomalies?: string[];
+};
+
 type AiResult = {
   totalExpenses: number;
   billPaymentsTotal?: number;
   categories: AiCategory[];
+
+  // Backward compatibility (you might still populate this in backend)
   notes?: string;
+
+  // NEW: structured insights
+  insights?: AiInsights;
 };
 
 type UploadAiResponse = {
@@ -29,7 +43,6 @@ type UploadAiResponse = {
 export default function SpendingIntelligencePage() {
   const { getToken } = useAuth();
 
-  // CHANGED: support multiple files + incremental selection
   const [files, setFiles] = useState<File[]>([]);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -43,7 +56,6 @@ export default function SpendingIntelligencePage() {
     const incoming = Array.from(fileList);
 
     setFiles((prev) => {
-      // Client-side dedup so user can select same file in multiple picks without duplicates.
       const seen = new Set(prev.map((f) => `${f.name}|${f.size}|${f.lastModified}`));
       const merged = [...prev];
 
@@ -54,7 +66,6 @@ export default function SpendingIntelligencePage() {
       return merged;
     });
 
-    // Reset input so selecting the same file again triggers onChange.
     if (inputRef.current) inputRef.current.value = "";
   }
 
@@ -91,8 +102,6 @@ export default function SpendingIntelligencePage() {
       }
 
       const formData = new FormData();
-
-      // CHANGED: send all selected files; backend should accept @RequestParam("files") List<MultipartFile>
       files.forEach((f) => formData.append("files", f));
 
       const response = await fetch(`${API_BASE}/api/transactions/upload`, {
@@ -114,10 +123,7 @@ export default function SpendingIntelligencePage() {
       }
 
       setResult(data as UploadAiResponse);
-
-      // Optional: clear selected files after success
       clearFiles();
-
       setMessage("File uploaded successfully. AI analysis complete.");
     } catch (err: any) {
       setMessage(err?.message ?? "Unexpected error occurred.");
@@ -130,6 +136,20 @@ export default function SpendingIntelligencePage() {
     !!result?.ai &&
     Array.isArray(result.ai.categories) &&
     result.ai.categories.length > 0;
+
+  const insights = result?.ai?.insights;
+
+  // Support both the new structured insights and legacy notes
+  const hasStructuredInsights =
+    !!insights &&
+    (hasAny(insights.highlights) ||
+      !!insights.topSpendingCategory ||
+      !!insights.topMerchant ||
+      hasAny(insights.concentrationNotes) ||
+      hasAny(insights.optimizationIdeas) ||
+      hasAny(insights.anomalies));
+
+  const hasLegacyNotes = !!result?.ai?.notes && result.ai.notes.trim().length > 0;
 
   return (
     <div
@@ -297,8 +317,8 @@ export default function SpendingIntelligencePage() {
               </li>
               <li>Top merchants within each category</li>
               <li>
-                AI-generated notes highlighting patterns, recurring charges, and
-                savings opportunities
+                AI-generated insights highlighting patterns, recurring charges,
+                and savings opportunities
               </li>
             </ul>
           </div>
@@ -309,18 +329,10 @@ export default function SpendingIntelligencePage() {
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <Stat label="Transactions Used" value={result!.transactionCount} />
 
-            <Stat
-              label="Total Expenses"
-              value={Number(result!.ai.totalExpenses)}
-              money
-            />
+            <Stat label="Total Expenses" value={Number(result!.ai.totalExpenses)} money />
 
             {typeof result!.ai.billPaymentsTotal === "number" && (
-              <Stat
-                label="Bill Payment"
-                value={Number(result!.ai.billPaymentsTotal)}
-                money
-              />
+              <Stat label="Bill Payment" value={Number(result!.ai.billPaymentsTotal)} money />
             )}
           </div>
 
@@ -368,12 +380,86 @@ export default function SpendingIntelligencePage() {
               Source file: {result!.filename}
             </div>
 
-            {result!.ai.notes && (
-              <div style={{ marginTop: 14, fontSize: 13, opacity: 0.9 }}>
-                <div style={{ fontWeight: 800, marginBottom: 4 }}>
-                  AI Insights
-                </div>
-                <div style={{ whiteSpace: "pre-wrap" }}>{result!.ai.notes}</div>
+            {/* NEW: AI Insights section */}
+            {(hasStructuredInsights || hasLegacyNotes) && (
+              <div style={{ marginTop: 16, fontSize: 13, opacity: 0.95 }}>
+                <div style={{ fontWeight: 900, marginBottom: 8 }}>AI Insights</div>
+
+                {hasStructuredInsights ? (
+                  <div style={{ lineHeight: 1.55 }}>
+                    {/* Highlights */}
+                    {hasAny(insights?.highlights) && (
+                      <ul style={{ marginTop: 0, marginBottom: 10, paddingLeft: 18 }}>
+                        {insights!.highlights!.map((h, idx) => (
+                          <li key={`hl-${idx}`}>{h}</li>
+                        ))}
+                      </ul>
+                    )}
+
+                    {/* Key calls */}
+                    {(insights?.topSpendingCategory || insights?.topMerchant) && (
+                      <div style={{ marginBottom: 10 }}>
+                        {insights?.topSpendingCategory && (
+                          <div>
+                            <b>Top category:</b> {insights.topSpendingCategory}
+                          </div>
+                        )}
+                        {insights?.topMerchant && (
+                          <div>
+                            <b>Top merchant:</b> {insights.topMerchant}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Concentration */}
+                    {hasAny(insights?.concentrationNotes) && (
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{ fontWeight: 800, marginBottom: 4 }}>
+                          Concentration
+                        </div>
+                        <ul style={{ marginTop: 0, marginBottom: 0, paddingLeft: 18 }}>
+                          {insights!.concentrationNotes!.map((n, idx) => (
+                            <li key={`cn-${idx}`}>{n}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Optimization */}
+                    {hasAny(insights?.optimizationIdeas) && (
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{ fontWeight: 800, marginBottom: 4 }}>
+                          Optimization ideas
+                        </div>
+                        <ul style={{ marginTop: 0, marginBottom: 0, paddingLeft: 18 }}>
+                          {insights!.optimizationIdeas!.map((n, idx) => (
+                            <li key={`op-${idx}`}>{n}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Anomalies */}
+                    {hasAny(insights?.anomalies) && (
+                      <div style={{ marginBottom: 0 }}>
+                        <div style={{ fontWeight: 800, marginBottom: 4 }}>
+                          Anomalies
+                        </div>
+                        <ul style={{ marginTop: 0, marginBottom: 0, paddingLeft: 18 }}>
+                          {insights!.anomalies!.map((n, idx) => (
+                            <li key={`an-${idx}`}>{n}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // Legacy notes fallback (if backend still returns notes)
+                  <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.55 }}>
+                    {result!.ai.notes}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -427,4 +513,8 @@ function fmtMoney(n: number) {
     style: "currency",
     currency: "USD",
   }).format(n);
+}
+
+function hasAny(arr?: unknown[]) {
+  return Array.isArray(arr) && arr.length > 0;
 }

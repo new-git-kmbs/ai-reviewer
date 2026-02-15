@@ -48,6 +48,10 @@ public class TransactionsService {
         // Parse + merge transactions from all files
         List<Txn> txns = parseCsv(files);
 
+        // Track date range for "usable" items (non-payments, non-zero)
+        LocalDate minDate = null;
+        LocalDate maxDate = null;
+
         // Build LLM items (exclude payments but track them)
         List<Map<String, Object>> items = new ArrayList<>();
         int id = 0;
@@ -67,6 +71,10 @@ public class TransactionsService {
                 }
                 continue;
             }
+
+            // Date range (only for usable items)
+            if (minDate == null || t.date().isBefore(minDate)) minDate = t.date();
+            if (maxDate == null || t.date().isAfter(maxDate)) maxDate = t.date();
 
             String kind;
             BigDecimal value;
@@ -95,10 +103,8 @@ public class TransactionsService {
             throw new IllegalArgumentException("No usable transactions found (after excluding payments).");
         }
 
-        // CHANGED: chunk the LLM calls so we never exceed small token budgets
+        // Chunk the LLM calls so we never exceed small token budgets
         Map<Integer, String> txnIdToCategory = new HashMap<>();
-        String combinedNotes = null;
-
         List<List<Map<String, Object>>> chunks = chunkItems(items, MAX_ITEMS_PER_LLM_CALL);
 
         int expectedTxnCount = items.size();
@@ -151,12 +157,6 @@ public class TransactionsService {
                     }
                     txnIdToCategory.put(tid, cat);
                 }
-            }
-
-            // Keep one short notes string (optional)
-            Object notesObj = aiJson.get("notes");
-            if (combinedNotes == null && notesObj instanceof String s && !s.isBlank()) {
-                combinedNotes = s.trim();
             }
         }
 
@@ -256,9 +256,15 @@ public class TransactionsService {
         // include bill payment total so UI can show it at the top
         aiJsonOut.put("billPaymentsTotal", billPaymentsTotal);
 
-        if (combinedNotes != null) {
-            aiJsonOut.put("notes", combinedNotes);
-        }
+        // ---------------- NEW: AI Insights (from deterministic aggregates, not raw txns) ----------------
+        Map<String, Object> summaryForInsights = buildInsightsSummary(
+                items, rebuiltCategories, grossSpend, refundsTotal, netSpend, billPaymentsTotal, minDate, maxDate
+        );
+
+        String insightsPrompt = buildInsightsPrompt(summaryForInsights);
+        String insightsText = callAnthropic(insightsPrompt);
+        Map<String, Object> insightsJson = parseJsonObject(insightsText);
+        aiJsonOut.put("insights", insightsJson);
 
         Map<String, Object> result = new HashMap<>();
         result.put("ok", true);
@@ -270,6 +276,10 @@ public class TransactionsService {
 
     // ---------------- Prompt / LLM ----------------
 
+    /**
+     * Categorization prompt ONLY.
+     * CHANGED: removed "notes" and removed "totalExpenses" (AI should not do math / narration).
+     */
     private String buildPrompt(List<Map<String, Object>> items) {
         String txnsJson;
         try {
@@ -306,22 +316,154 @@ Rules (MUST follow all):
 
 Output schema (JSON):
 {
-  "totalExpenses": number,
   "categories": [
     {
       "category": string,
       "txnIds": [number]
     }
-  ],
-  "notes": string
+  ]
 }
-
-Notes guidance:
-- Keep notes short (<= 400 chars).
-- Mention any large refunds/returns and which merchants they came from.
 
 Transactions JSON:
 """ + txnsJson;
+    }
+
+    /**
+     * NEW: Insights prompt uses deterministic aggregates only (no raw txns).
+     */
+    private String buildInsightsPrompt(Map<String, Object> summary) {
+        String json;
+        try {
+            json = objectMapper.writeValueAsString(summary);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Failed to serialize summary for insights prompt.", e);
+        }
+
+        return """
+You are a financial behavior analyst.
+
+Generate insights based ONLY on the provided summary JSON.
+Do NOT narrate individual transactions.
+Do NOT invent context like vacations, locations, or reasons for spending.
+
+Focus on:
+- Where the most money is going (top categories)
+- Which merchants receive the most money
+- Spend concentration (percentages)
+- Recurring behavior (merchant frequency)
+- Practical optimization ideas
+- Anomalies only if clearly indicated by the summary
+
+Return STRICT JSON ONLY (no markdown, no commentary).
+
+Output schema:
+{
+  "highlights": [string],
+  "topSpendingCategory": string,
+  "topMerchant": string,
+  "concentrationNotes": [string],
+  "optimizationIdeas": [string],
+  "anomalies": [string]
+}
+
+Summary JSON:
+""" + json;
+    }
+
+    /**
+     * NEW: Deterministic aggregates for AI Insights.
+     */
+    private Map<String, Object> buildInsightsSummary(
+            List<Map<String, Object>> items,
+            List<Map<String, Object>> rebuiltCategories,
+            BigDecimal grossSpend,
+            BigDecimal refundsTotal,
+            BigDecimal netSpend,
+            BigDecimal billPaymentsTotal,
+            LocalDate minDate,
+            LocalDate maxDate
+    ) {
+        Map<String, Object> out = new HashMap<>();
+
+        out.put("periodStart", minDate == null ? null : minDate.toString());
+        out.put("periodEnd", maxDate == null ? null : maxDate.toString());
+
+        out.put("transactionCount", items.size());
+        out.put("grossSpend", grossSpend);
+        out.put("refundsTotal", refundsTotal);
+        out.put("netSpend", netSpend);
+        out.put("billPaymentsTotal", billPaymentsTotal);
+
+        // Overall merchant totals + frequency (expenses only)
+        Map<String, BigDecimal> merchantTotals = new HashMap<>();
+        Map<String, Integer> merchantCounts = new HashMap<>();
+
+        for (Map<String, Object> m : items) {
+            String kind = String.valueOf(m.get("kind"));
+            if (!"expense".equals(kind)) continue;
+
+            String merchant = String.valueOf(m.get("merchant"));
+            BigDecimal amt = toBigDecimal(m.get("amount"));
+
+            merchantTotals.merge(merchant, amt, BigDecimal::add);
+            merchantCounts.merge(merchant, 1, Integer::sum);
+        }
+
+        List<Map<String, Object>> topMerchants = merchantTotals.entrySet().stream()
+                .sorted((a, b) -> b.getValue().compareTo(a.getValue()))
+                .limit(10)
+                .map(e -> {
+                    Map<String, Object> mm = new HashMap<>();
+                    mm.put("merchant", e.getKey());
+                    mm.put("total", e.getValue());
+                    mm.put("count", merchantCounts.getOrDefault(e.getKey(), 0));
+                    return mm;
+                })
+                .toList();
+
+        out.put("topMerchants", topMerchants);
+
+        // Top categories with percentages and their top merchants (already computed deterministically)
+        List<Map<String, Object>> topCategories = rebuiltCategories.stream()
+                .filter(c -> !"Refunds".equals(String.valueOf(c.get("category"))))
+                .filter(c -> toBigDecimal(c.get("total")).compareTo(BigDecimal.ZERO) > 0)
+                .limit(10)
+                .map(c -> {
+                    String cat = String.valueOf(c.get("category"));
+                    BigDecimal total = toBigDecimal(c.get("total"));
+
+                    BigDecimal pct = BigDecimal.ZERO;
+                    if (grossSpend != null && grossSpend.compareTo(BigDecimal.ZERO) > 0) {
+                        // percentage rounded to 1 decimal place for readability
+                        pct = total.multiply(new BigDecimal("100"))
+                                .divide(grossSpend, 1, java.math.RoundingMode.HALF_UP);
+                    }
+
+                    Map<String, Object> cc = new HashMap<>();
+                    cc.put("category", cat);
+                    cc.put("total", total);
+                    cc.put("percentageOfGrossSpend", pct);
+                    cc.put("topMerchants", c.get("merchants"));
+                    return cc;
+                })
+                .toList();
+
+        out.put("topCategories", topCategories);
+
+        // Useful for "concentration" insights: top-3 categories share
+        BigDecimal top3 = BigDecimal.ZERO;
+        for (int i = 0; i < Math.min(3, topCategories.size()); i++) {
+            top3 = top3.add(toBigDecimal(topCategories.get(i).get("total")));
+        }
+        BigDecimal top3Pct = BigDecimal.ZERO;
+        if (grossSpend != null && grossSpend.compareTo(BigDecimal.ZERO) > 0) {
+            top3Pct = top3.multiply(new BigDecimal("100"))
+                    .divide(grossSpend, 1, java.math.RoundingMode.HALF_UP);
+        }
+        out.put("top3CategoriesTotal", top3);
+        out.put("top3CategoriesPctOfGrossSpend", top3Pct);
+
+        return out;
     }
 
     private String callAnthropic(String prompt) {
@@ -338,7 +480,7 @@ Transactions JSON:
         Map<String, Object> body = Map.of(
                 "model", model,
                 // Keep output bounded; input size is controlled via chunking
-                "max_tokens", 600,
+                "max_tokens", 700,
                 "temperature", 0.2,
                 "messages", List.of(
                         Map.of("role", "user", "content", prompt)
