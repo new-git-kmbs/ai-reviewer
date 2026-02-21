@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState, useEffect } from "react";
 import { useAuth } from "@clerk/clerk-react";
 
 type AiMerchant = {
@@ -10,6 +10,7 @@ type AiCategory = {
   category: string;
   total: number;
   merchants: AiMerchant[];
+  txnIds?: number[];
 };
 
 type AiInsights = {
@@ -35,6 +36,7 @@ type UploadAiResponse = {
   filename: string;
   transactionCount: number;
   ai: AiResult;
+  availableCategories?: string[];
 };
 
 
@@ -54,6 +56,15 @@ export default function SpendingIntelligencePage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [result, setResult] = useState<UploadAiResponse | null>(null);
+
+  // 🔹 Local categories (mutable)
+  const [localCategories, setLocalCategories] = useState<AiCategory[]>([]);
+
+  useEffect(() => {
+    if (result?.ai?.categories) {
+      setLocalCategories(result.ai.categories);
+    }
+  }, [result]);
 
   const monthOptions = useMemo(() => buildRecentMonthOptions(18), []);
 
@@ -131,6 +142,7 @@ export default function SpendingIntelligencePage() {
       }
 
       setResult(data as UploadAiResponse);
+	  console.log("UPLOAD RESPONSE:", data);
       clearFiles();
       setMessage(`File uploaded successfully. AI analysis complete for ${formatMonthLabel(selectedMonth)}.`);
     } catch (err: any) {
@@ -157,6 +169,53 @@ export default function SpendingIntelligencePage() {
       hasAny(insights.anomalies));
 
   const hasLegacyNotes = !!result?.ai?.notes && result.ai.notes.trim().length > 0;
+
+function moveMerchant(
+  fromCategory: string,
+  merchantName: string,
+  amount: number,
+  toCategory: string
+) {
+  if (fromCategory === toCategory) return;
+
+  setLocalCategories((prev) => {
+    const updated = prev.map((c) => ({
+      ...c,
+      merchants: [...(c.merchants || [])],
+    }));
+
+    const source = updated.find((c) => c.category === fromCategory);
+    const target = updated.find((c) => c.category === toCategory);
+
+    if (!source) return prev;
+
+    const idx = source.merchants.findIndex(
+      (m) => m.merchant === merchantName
+    );
+
+    if (idx === -1) return prev;
+
+    const merchantObj = source.merchants[idx];
+
+    // Remove from source
+    source.merchants.splice(idx, 1);
+    source.total = Number(source.total) - Number(amount);
+
+    // Add to target
+    if (target) {
+      target.merchants.push(merchantObj);
+      target.total = Number(target.total) + Number(amount);
+    } else {
+      updated.push({
+        category: toCategory,
+        total: amount,
+        merchants: [merchantObj],
+      });
+    }
+
+    return updated.sort((a, b) => Number(b.total) - Number(a.total));
+  });
+}
 
   return (
     <div
@@ -381,7 +440,7 @@ export default function SpendingIntelligencePage() {
               Spending by Category
             </div>
 
-            {result!.ai.categories.map((c) => (
+            {localCategories.map((c) => (
               <div key={c.category} style={{ marginBottom: 16 }}>
                 <div style={{ fontWeight: 900 }}>
                   {c.category} — {fmtMoney(Number(c.total))}
@@ -393,16 +452,36 @@ export default function SpendingIntelligencePage() {
                       <tr>
                         <th style={th}>Merchant</th>
                         <th style={th}>Amount</th>
+                      <th style={th}>Move To</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {(c.merchants || []).map((m) => (
-                        <tr key={`${c.category}-${m.merchant}`}>
-                          <td style={td}>{m.merchant}</td>
-                          <td style={td}>{fmtMoney(Number(m.amount))}</td>
-                        </tr>
-                      ))}
-                    </tbody>
+  {(c.merchants || []).map((m) => (
+    <tr key={`${c.category}-${m.merchant}`}>
+      <td style={td}>{m.merchant}</td>
+      <td style={td}>{fmtMoney(Number(m.amount))}</td>
+      <td style={td}>
+       <select
+  value={c.category}
+  onChange={(e) =>
+    moveMerchant(
+      c.category,
+      m.merchant,
+      Number(m.amount),
+      e.target.value
+    )
+  }
+>
+  {localCategories.map((opt) => (
+    <option key={opt.category} value={opt.category}>
+      {opt.category}
+    </option>
+  ))}
+</select>
+      </td>
+    </tr>
+  ))}
+</tbody>
                   </table>
                 </div>
               </div>
