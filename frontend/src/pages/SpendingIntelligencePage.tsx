@@ -517,7 +517,7 @@ function sum(arr: AiMerchant[]) {
           <b>Amount</b> (column names may vary by bank).
           <br />
           You can select multiple files at once, or add more files in multiple
-          picks — analysis runs only when you click <b>Upload & Analyze</b>.
+          picks — analysis runs only when you click <b>Generate Insights</b> after Upload.
         </div>
 
         <div>
@@ -530,7 +530,7 @@ function sum(arr: AiMerchant[]) {
               opacity: loading || files.length === 0 ? 0.7 : 1,
             }}
           >
-            {loading ? "Uploading..." : `Upload & Analyze (${formatMonthLabel(selectedMonth)})`}
+            {loading ? "Uploading..." : `Upload (${formatMonthLabel(selectedMonth)})`}
           </button>
         </div>
 
@@ -561,25 +561,25 @@ function sum(arr: AiMerchant[]) {
           }}
         >
           <div style={{ fontWeight: 800, marginBottom: 8 }}>
-            Spending Synopsis
+             Spending Workspace
           </div>
 
           <div style={{ lineHeight: 1.5 }}>
-            Once uploaded, AI will analyze your transactions and generate a
-            structured breakdown of your expenses.
+            Upload your transaction file to generate categorized buckets for review.
+			You can adjust categories, move transfers or investments, and refine
+			your structure before generating AI insights.
           </div>
 
           <div style={{ marginTop: 10 }}>
-            You’ll receive:
+            Workflow:
             <ul style={{ marginTop: 8 }}>
               <li>
                 Totals by category (Subscriptions, Dining, Groceries, Bills,
                 Shopping, Transport, etc.)
               </li>
-              <li>Top merchants within each category</li>
+              <li>Review and adjust categories</li>
               <li>
-                AI-generated insights highlighting patterns, recurring charges,
-                and savings opportunities
+                Click <b>Generate Insights</b> for AI analysis
               </li>
             </ul>
           </div>
@@ -608,12 +608,20 @@ function sum(arr: AiMerchant[]) {
     money
   />
 )}
-			{result?.ai?.netCashFlow != null && (
+{/*{result?.ai?.netCashFlow != null && (
 				<Stat
 					label="Net Cash Flow"
 					value={Number(result.ai.netCashFlow)}
 					money
 					highlight
+				/>
+)}*/}
+			{typeof result!.ai.transfersTotal === "number" &&
+				Number(result!.ai.transfersTotal) > 0 && (
+				<Stat
+					label="Bill Payment"
+					value={Number(result!.ai.transfersTotal)}
+					money
 				/>
 			)}
 			<Stat label="Transactions Used" value={result!.transactionCount} />

@@ -87,7 +87,18 @@ public class TransactionsService {
                 continue;
             }
 			if (isTransfer(desc)) {
-				transfersTotal = transfersTotal.add(amt.abs());
+				//////////////////// DEBUG start
+				System.out.println("==== TRANSFER MATCH ====");
+				System.out.println("Date: " + t.date());
+				System.out.println("Description: " + desc);
+				System.out.println("Raw Amount: " + amt);
+				System.out.println("Abs Added To Transfers: " + amt.abs());
+				System.out.println("========================");
+				
+				/////////////////// DEBUG end
+				if (amt.compareTo(BigDecimal.ZERO) < 0) {
+					transfersTotal = transfersTotal.add(amt.abs());
+				}
 				continue;
 			}
 			if (isInvestment(desc)) {
@@ -97,12 +108,12 @@ public class TransactionsService {
             if (isPayment(desc)) {
 				billPaymentCount++;
 				///////// Debug start
-			/*	System.out.println("==== BILL PAYMENT MATCH ====");
+				System.out.println("==== BILL PAYMENT MATCH ====");
     System.out.println("Date: " + t.date());
     System.out.println("Description: " + desc);
     System.out.println("Raw Amount: " + amt);
     System.out.println("Abs Added To Total: " + amt.abs());
-    System.out.println("============================");*/
+    System.out.println("============================");
 				//////// Debug end
                 billPaymentsTotal = billPaymentsTotal.add(amt.abs());
                 continue;
@@ -126,16 +137,16 @@ public class TransactionsService {
             if (items.size() >= MAX_TOTAL_ITEMS) break;
         }
 /////// Debug start
-/*System.out.println("######## BILL PAYMENT FINAL TOTAL ########");
+System.out.println("######## BILL PAYMENT FINAL TOTAL ########");
 System.out.println("Bill payment transactions counted: " + billPaymentCount);
 System.out.println("billPaymentsTotal = " + billPaymentsTotal);
-System.out.println("##########################################");*/
+System.out.println("##########################################");
 ////// Debug end
         if (items.isEmpty()) {
             throw new IllegalArgumentException("No usable transactions found.");
         }
 /////////////////////Debug Start
-/*System.out.println("==== ITEMS BEING SENT TO AI FOR CATEGORIZATION ====");
+System.out.println("==== ITEMS BEING SENT TO AI FOR CATEGORIZATION ====");
 
 for (Map<String, Object> item : items) {
     System.out.println(
@@ -148,7 +159,7 @@ for (Map<String, Object> item : items) {
 }
 
 System.out.println("Total items sent to AI: " + items.size());
-System.out.println("==== END OF ITEMS SENT TO AI ====");*/
+System.out.println("==== END OF ITEMS SENT TO AI ====");
 
 ////////////////////Debug End
         // ✅ Real AI categorization restored
