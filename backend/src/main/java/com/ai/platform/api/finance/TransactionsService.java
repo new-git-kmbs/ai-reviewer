@@ -61,11 +61,10 @@ public class TransactionsService {
 
     public Map<String, Object> aiAnalyze(List<MultipartFile> files, String monthKey) {
 
-        BigDecimal billPaymentsTotal = BigDecimal.ZERO;
         BigDecimal payrollTotal = BigDecimal.ZERO;
 		BigDecimal transfersTotal = BigDecimal.ZERO;
 		BigDecimal investmentsTotal = BigDecimal.ZERO;
-		int billPaymentCount = 0;
+		
 
         List<Txn> txnsAll = csvParser.parseCsv(files);
         List<Txn> txns = filterTxnsToMonth(txnsAll, monthKey);
@@ -86,39 +85,31 @@ public class TransactionsService {
                 payrollTotal = payrollTotal.add(amt);
                 continue;
             }
-			if (isTransfer(desc)) {
-				//////////////////// DEBUG start
-				System.out.println("==== TRANSFER MATCH ====");
-				System.out.println("Date: " + t.date());
-				System.out.println("Description: " + desc);
-				System.out.println("Raw Amount: " + amt);
-				System.out.println("Abs Added To Transfers: " + amt.abs());
-				System.out.println("========================");
-				
-				/////////////////// DEBUG end
-				if (amt.compareTo(BigDecimal.ZERO) < 0) {
-					transfersTotal = transfersTotal.add(amt.abs());
-				}
-				continue;
-			}
+if (isTransfer(desc)) {
+
+    System.out.println("==== TRANSFER MATCH ====");
+    System.out.println("Date: " + t.date());
+    System.out.println("Description: " + desc);
+    System.out.println("Raw Amount: " + amt);
+    System.out.println("========================");
+
+    String s = desc.toLowerCase(Locale.ROOT);
+
+    // Credit card payments → Bill Payment system bucket
+    if (s.contains("credit card") || s.contains("payment - thank you") || s.contains("ach pmt")) {
+        if (amt.compareTo(BigDecimal.ZERO) < 0) {
+            transfersTotal = transfersTotal.add(amt.abs());
+        }
+        continue;
+    }
+
+    // Internal transfers → let them flow to AI categorization
+}
 			if (isInvestment(desc)) {
 				investmentsTotal = investmentsTotal.add(amt.abs());
 				continue;
 			}
-            if (isPayment(desc)) {
-				billPaymentCount++;
-				///////// Debug start
-				System.out.println("==== BILL PAYMENT MATCH ====");
-    System.out.println("Date: " + t.date());
-    System.out.println("Description: " + desc);
-    System.out.println("Raw Amount: " + amt);
-    System.out.println("Abs Added To Total: " + amt.abs());
-    System.out.println("============================");
-				//////// Debug end
-                billPaymentsTotal = billPaymentsTotal.add(amt.abs());
-                continue;
-            }
-
+ 
             if (minDate == null || t.date().isBefore(minDate)) minDate = t.date();
             if (maxDate == null || t.date().isAfter(maxDate)) maxDate = t.date();
 
@@ -137,10 +128,10 @@ public class TransactionsService {
             if (items.size() >= MAX_TOTAL_ITEMS) break;
         }
 /////// Debug start
-System.out.println("######## BILL PAYMENT FINAL TOTAL ########");
+/*System.out.println("######## BILL PAYMENT FINAL TOTAL ########");
 System.out.println("Bill payment transactions counted: " + billPaymentCount);
 System.out.println("billPaymentsTotal = " + billPaymentsTotal);
-System.out.println("##########################################");
+System.out.println("##########################################");*/
 ////// Debug end
         if (items.isEmpty()) {
             throw new IllegalArgumentException("No usable transactions found.");
@@ -235,8 +226,7 @@ System.out.println("==== END OF ITEMS SENT TO AI ====");
         aiOut.put("categories", categoriesOut);
         aiOut.put("totalExpenses", netSpend);
         aiOut.put("grossSpend", grossSpend);
-        aiOut.put("refundsTotal", refundsTotal);
-        aiOut.put("billPaymentsTotal", billPaymentsTotal);
+        aiOut.put("refundsTotal", refundsTotal);        
         aiOut.put("payrollTotal", payrollTotal);
 		aiOut.put("netCashFlow", netCashFlow);
 		aiOut.put("investmentsTotal", investmentsTotal);
@@ -343,18 +333,6 @@ return result;
         }
         return out;
     }
-
-private boolean isPayment(String desc) {
-    if (desc == null) return false;
-    String s = desc.toLowerCase(Locale.ROOT);
-
-    return s.contains("credit card payment")
-        || s.contains("payment - thank you")
-        || s.contains("online banking transfer")
-        || s.contains("transfer to")
-        || s.contains("transfer from")
-        || s.contains("thank you for your payment");
-}
 
     private boolean isPayroll(String desc) {
         if (desc == null) return false;
