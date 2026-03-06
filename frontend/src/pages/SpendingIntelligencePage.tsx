@@ -250,7 +250,10 @@ const derivedTotalExpenses = useMemo(() => {
   return derivedCategories.reduce((sum, c) => sum + c.total, 0);
 }, [derivedCategories]);
 
-const derivedInsights = null;
+const derivedInsights: {
+  topSpendingCategory?: string;
+  topMerchant?: string;
+} | null = null;
 
   const insights: AiInsights | null = useMemo(() => {
   if (!result?.ai?.insights && !derivedInsights) return null;
