@@ -74,7 +74,7 @@ export default function SpendingIntelligencePage() {
 });
 
 useEffect(() => {
-  if (result?.ai?.categories && localCategories.length === 0) {
+  if (result?.ai?.categories) {
     setLocalCategories(result.ai.categories);
   }
 }, [result]);
@@ -161,6 +161,15 @@ useEffect(() => {
     insights: undefined,
   },
 });
+setLocalCategories(data.ai.categories);
+
+setSystemBuckets({
+  Investments: [],
+  Transfers: [],
+  Excluded: [],
+});
+
+setHasGeneratedInsights(false);
 
 setHasGeneratedInsights(false);
 	  console.log("UPLOAD RESPONSE:", data);
