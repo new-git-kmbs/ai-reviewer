@@ -430,7 +430,7 @@ function sum(arr: AiMerchant[]) {
           ref={inputRef}
           type="file"
           multiple
-          accept=".csv,.xlsx,.xls"
+          accept=".csv,.xlsx,.xls,.pdf"
           onChange={(e) => addFiles(e.target.files)}
           style={{ marginBottom: 8 }}
         />

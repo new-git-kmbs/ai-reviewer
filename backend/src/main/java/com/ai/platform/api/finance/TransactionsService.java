@@ -12,6 +12,7 @@ import java.util.*;
 public class TransactionsService {
 
     private final CsvTransactionParser csvParser;
+	private final PdfTransactionParser pdfParser;
     private final AiCategorizationService categorizationService;
     private final AiInsightsService insightsService;
 
@@ -19,10 +20,12 @@ public class TransactionsService {
 
     public TransactionsService(
             CsvTransactionParser csvParser,
+			PdfTransactionParser pdfParser,
             AiCategorizationService categorizationService,
             AiInsightsService insightsService
     ) {
         this.csvParser = csvParser;
+		this.pdfParser = pdfParser;
         this.categorizationService = categorizationService;
         this.insightsService = insightsService;
     }
@@ -66,8 +69,41 @@ public class TransactionsService {
 		BigDecimal investmentsTotal = BigDecimal.ZERO;
 		
 
-        List<Txn> txnsAll = csvParser.parseCsv(files);
+        List<Txn> txnsAll = new ArrayList<>();
+
+		List<MultipartFile> csvFiles = new ArrayList<>();
+		List<MultipartFile> pdfFiles = new ArrayList<>();
+
+		for (MultipartFile f : files) {
+
+			String name = f.getOriginalFilename();
+			if (name == null) continue;
+
+			String lower = name.toLowerCase(Locale.ROOT);
+
+			if (lower.endsWith(".csv")) {
+				csvFiles.add(f);
+			} else if (lower.endsWith(".pdf")) {
+				pdfFiles.add(f);
+			}
+		}
+
+		if (!csvFiles.isEmpty()) {
+			txnsAll.addAll(csvParser.parseCsv(csvFiles));
+		}
+
+		if (!pdfFiles.isEmpty()) {
+			txnsAll.addAll(pdfParser.parsePdf(pdfFiles, monthKey));
+		}
+		
+		if (txnsAll.isEmpty()) {
+			throw new IllegalArgumentException("No supported files found. Upload CSV or PDF statements.");
+		}
+		
+System.out.println("Total transactions parsed before month filter: " + txnsAll.size());
         List<Txn> txns = filterTxnsToMonth(txnsAll, monthKey);
+System.out.println("Transactions after month filter: " + txns.size());		
+		
         LocalDate minDate = null;
         LocalDate maxDate = null;
 
@@ -86,13 +122,7 @@ public class TransactionsService {
                 continue;
             }
 if (isTransfer(desc)) {
-////////Debug start
-   /* System.out.println("==== TRANSFER MATCH ====");
-    System.out.println("Date: " + t.date());
-    System.out.println("Description: " + desc);
-    System.out.println("Raw Amount: " + amt);
-    System.out.println("========================");*/
-///////////Debug end
+
     String s = desc.toLowerCase(Locale.ROOT);
 
     // Credit card payments → Bill Payment system bucket
@@ -127,37 +157,39 @@ if (isTransfer(desc)) {
 
             if (items.size() >= MAX_TOTAL_ITEMS) break;
         }
-/////// Debug start
-/*System.out.println("######## BILL PAYMENT FINAL TOTAL ########");
-System.out.println("Bill payment transactions counted: " + billPaymentCount);
-System.out.println("billPaymentsTotal = " + billPaymentsTotal);
-System.out.println("##########################################");*/
-////// Debug end
+
         if (items.isEmpty()) {
             throw new IllegalArgumentException("No usable transactions found.");
         }
-/////////////////////Debug Start
-/*System.out.println("==== ITEMS BEING SENT TO AI FOR CATEGORIZATION ====");
 
-for (Map<String, Object> item : items) {
-    System.out.println(
-        "ID: " + item.get("id") +
-        " | Date: " + item.get("date") +
-        " | Merchant: " + item.get("merchant") +
-        " | Amount: " + item.get("amount") +
-        " | Kind: " + item.get("kind")
-    );
-}
-
-System.out.println("Total items sent to AI: " + items.size());
-System.out.println("==== END OF ITEMS SENT TO AI ====");*/
-
-////////////////////Debug End
         // ✅ Real AI categorization restored
         Map<Integer, String> txnIdToCategory =
                 categorizationService.categorize(items);
 
         Map<Integer, Item> idToItem = buildIdToItem(items);
+		
+////////////////Debug start
+System.out.println("\n===== TRANSACTION DEBUG =====");
+
+for (int tid = 1; tid <= items.size(); tid++) {
+
+    Item it = idToItem.get(tid);
+    if (it == null) continue;
+
+    String category = txnIdToCategory.getOrDefault(tid, "Other");
+
+    System.out.println(
+        "ID=" + tid +
+        " | Merchant=" + it.merchant() +
+        " | Amount=" + it.amount() +
+        " | Kind=" + it.kind() +
+        " | Category=" + category
+    );
+}
+
+System.out.println("===== END TRANSACTION DEBUG =====\n");
+
+///////////////Debug end		
 
         Map<String, LinkedHashSet<Integer>> catToIds = new HashMap<>();
         BigDecimal grossSpend = BigDecimal.ZERO;
