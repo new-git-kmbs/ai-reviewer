@@ -43,8 +43,9 @@ public class CsvTransactionParser {
 
         LinkedHashMap<String, Txn> dedup = new LinkedHashMap<>();
         for (Txn t : all) {
-            String key = t.date() + "|" + t.amount() + "|" +
-                    normalizeMerchant(t.description()).toLowerCase(Locale.ROOT);
+            String merchant = normalizeMerchant(t.description()).toLowerCase(Locale.ROOT);
+			String key = t.date() + "|" + t.amount() + "|" +
+			merchant.substring(0, Math.min(40, merchant.length()));
             dedup.putIfAbsent(key, t);
         }
 
@@ -95,7 +96,7 @@ public class CsvTransactionParser {
                 if (dateRaw == null || dateRaw.isBlank()) continue;
 
                 LocalDate date = parseDate(dateRaw);
-                String desc = descCol.isEmpty() ? "" : Optional.ofNullable(safeGet(r, descCol)).orElse("");
+                String desc = descCol.isEmpty() ? "" : Optional.ofNullable(safeGet(r, descCol)).orElse("").trim();
 
                 BigDecimal amount;
                 if (amountCol != null) {

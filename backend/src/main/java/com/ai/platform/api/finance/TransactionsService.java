@@ -99,10 +99,40 @@ public class TransactionsService {
 		if (txnsAll.isEmpty()) {
 			throw new IllegalArgumentException("No supported files found. Upload CSV or PDF statements.");
 		}
+		////////////Debug start
+System.out.println("Total transactions parsed before month filter: " + txnsAll.size());		
+System.out.println("\n===== RAW PARSED TRANSACTIONS =====");
+
+for (Txn t : txnsAll) {
+    System.out.println(
+        "RAW | Date=" + t.date() +
+        " | Desc=" + t.description() +
+        " | Amount=" + t.amount()
+    );
+}
+
+System.out.println("===== END RAW =====\n");
+////////////Debug end
 		
-System.out.println("Total transactions parsed before month filter: " + txnsAll.size());
+
+
         List<Txn> txns = filterTxnsToMonth(txnsAll, monthKey);
-System.out.println("Transactions after month filter: " + txns.size());		
+		
+////////////Debug start
+System.out.println("\n===== AFTER MONTH FILTER =====");
+
+for (Txn t : txns) {
+    System.out.println(
+        "MONTH_OK | Date=" + t.date() +
+        " | Desc=" + t.description() +
+        " | Amount=" + t.amount()
+    );
+}
+System.out.println("===== END MONTH FILTER =====\n");
+System.out.println("Transactions after month filter: " + txns.size());
+		////////////Debug end
+		
+		
 		
         LocalDate minDate = null;
         LocalDate maxDate = null;
@@ -111,13 +141,23 @@ System.out.println("Transactions after month filter: " + txns.size());
         int id = 0;
 
         for (Txn t : txns) {
-
+////Debug start
+System.out.println(
+        "PROCESSING | Date=" + t.date() +
+        " | Desc=" + t.description() +
+        " | Amount=" + t.amount()
+    );
+////Debug end
             String desc = t.description();
             BigDecimal amt = t.amount();
 			
             if (amt == null || amt.compareTo(BigDecimal.ZERO) == 0) continue;
 
             if (amt.compareTo(BigDecimal.ZERO) > 0 && isPayroll(desc)) {
+				
+				 System.out.println("REMOVED_PAYROLL | " + desc + " | " + amt);
+				 
+				 
                 payrollTotal = payrollTotal.add(amt);
                 continue;
             }
@@ -127,6 +167,9 @@ if (isTransfer(desc)) {
 
     // Credit card payments → Bill Payment system bucket
     if (s.contains("credit card") || s.contains("payment - thank you") || s.contains("ach pmt")) {
+		
+		 System.out.println("REMOVED_TRANSFER | " + desc + " | " + amt);
+		 
         if (amt.compareTo(BigDecimal.ZERO) < 0) {
             transfersTotal = transfersTotal.add(amt.abs());
         }
@@ -136,6 +179,9 @@ if (isTransfer(desc)) {
     // Internal transfers → let them flow to AI categorization
 }
 			if (isInvestment(desc)) {
+				
+				System.out.println("REMOVED_INVESTMENT | " + desc + " | " + amt);
+				
 				investmentsTotal = investmentsTotal.add(amt.abs());
 				continue;
 			}
@@ -148,6 +194,16 @@ if (isTransfer(desc)) {
 
             Map<String, Object> m = new HashMap<>();
             m.put("id", ++id);
+			
+			//////////////////Debug start
+			System.out.println(
+    "AI_INPUT | ID=" + id +
+    " | Merchant=" + desc +
+    " | Amount=" + value +
+    " | Kind=" + kind
+);
+			
+			/////////////////Debug end
             m.put("date", t.date().toString());
             m.put("merchant", desc);
             m.put("amount", value);
